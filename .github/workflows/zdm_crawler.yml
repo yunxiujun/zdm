@@ -55,8 +55,8 @@ jobs:
     - name: main logic
       env:
         maxPageSize: 5
-        minVoted: 20
-        minComments: 5
+        minVoted: 30
+        minComments: 10
         MIN_PUSH_SIZE: 1
         emailHost: ""
         emailPort: ""
