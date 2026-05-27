@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
@@ -69,7 +70,8 @@ public class ZdmCrawler {
         Map<String, String> envMap = System.getenv();
         String emailHost = System.getenv("emailHost"), emailAccount = System.getenv("emailAccount"),
                 emailPassword = System.getenv("emailPassword"), emailPort = envMap.getOrDefault("emailPort", "465"),
-                spt = System.getenv("spt");
+                wxpusherAppToken = System.getenv("WXPUSHER_APP_TOKEN"),
+                wxpusherUid = System.getenv("WXPUSHER_UID");
         int maxPageSize = Integer.parseInt(envMap.getOrDefault("maxPageSize", "10")),
                 minVoted = Integer.parseInt(envMap.getOrDefault("minVoted", "0")),
                 minComments = Integer.parseInt(envMap.getOrDefault("minComments", "0")),
@@ -97,7 +99,7 @@ public class ZdmCrawler {
             //通过邮箱推送
             boolean pushToEmail = pushToEmail(text, emailHost, emailPort, emailAccount, emailPassword);
             //通过WxPusher推送
-            boolean pushToWx = pushToWx(text, spt);
+            boolean pushToWx = pushToWx(text, wxpusherAppToken, wxpusherUid);
             if (!pushToEmail && !pushToWx)
                 throw new RuntimeException("未匹配到推送方式,请检查配置");
 
@@ -254,8 +256,8 @@ public class ZdmCrawler {
         }
     }
 
-    private static boolean pushToWx(String text, String spt) {
-        if (StringUtils.isBlank(spt)) {
+    private static boolean pushToWx(String text, String appToken, String uid) {
+        if (StringUtils.isBlank(appToken) || StringUtils.isBlank(uid)) {
             System.out.println("WxPusher推送配置不完整,将尝试其他推送方式");
             return false;
         }
@@ -267,7 +269,11 @@ public class ZdmCrawler {
         body.put("summary", "zdm优惠信息汇总");
         //内容类型 1表示文字  2表示html 3表示markdown
         body.put("contentType", "2");
-        body.put("spt", System.getenv("spt"));
+        body.put("appToken", appToken);
+        body.put("uids", Arrays.stream(uid.split(","))
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toList()));
         String response = HttpUtil.createPost(WXPUSHER_URL)
                 .contentType(ContentType.JSON.getValue())
                 .body(JSONObject.toJSONString(body))

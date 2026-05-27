@@ -62,7 +62,8 @@ jobs:
         emailPort: ""
         emailAccount: ""
         emailPassword: ""
-        spt: ${{ secrets.SPT }}
+        WXPUSHER_APP_TOKEN: ${{ secrets.WXPUSHER_APP_TOKEN }}
+        WXPUSHER_UID: ${{ secrets.WXPUSHER_UID }}
         detail: false
       run: java -jar zdm.jar
     - name: check database changes
