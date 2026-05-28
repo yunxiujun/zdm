@@ -1,5 +1,9 @@
 package lx;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.net.HttpCookie;
 import java.time.Duration;
 import java.time.Instant;
@@ -77,6 +81,11 @@ public class ZdmCrawler {
                 minComments = Integer.parseInt(envMap.getOrDefault("minComments", "0")),
                 minPushSize = Integer.parseInt(envMap.getOrDefault("MIN_PUSH_SIZE", "0"));
         boolean detail = "true".equals(envMap.getOrDefault("detail", "false"));
+        appendSummary("## zdm_crawler");
+        appendSummary("- maxPageSize: " + maxPageSize);
+        appendSummary("- minVoted: " + minVoted);
+        appendSummary("- minComments: " + minComments);
+        appendSummary("- MIN_PUSH_SIZE: " + minPushSize);
 
         //获取待推送的优惠信息
         Collection<Zdm> zdms = obtainUnpushedArticles(maxPageSize);
@@ -84,15 +93,19 @@ public class ZdmCrawler {
         //根据各项规则执行过滤逻辑
         zdms = processFilter(zdms, minVoted, minComments, detail);
         System.out.println("过滤后剩余数据条数" + zdms.size());
+        appendSummary("- filteredCount: " + zdms.size());
 
         //在推送之前先入库数据,pushed字段默认为0(未推送)
         ZdmMapper.saveOrUpdateBatch(zdms);
 
         //未达到推送的数量阈值,则等待下次运行
-        if (zdms.size() < minPushSize)
+        if (zdms.size() < minPushSize) {
+            appendSummary("- push: skipped, filteredCount < MIN_PUSH_SIZE");
             return;
+        }
 
         //部分推送方式存在内容长度限制, 这里加了单次推送的条数限制, 超出则分批推送
+        appendSummary("- push: sending " + zdms.size() + " item(s)");
         Lists.partition(new ArrayList<>(zdms), 100).forEach(part -> {
             //生成推送消息的正文内容(html格式)
             String text = Utils.buildMessage(part);
@@ -191,6 +204,7 @@ public class ZdmCrawler {
         //白词过滤内容
         HashSet<String> whiteWords = Utils.readFile("./white_words.txt");
         whiteWords.removeIf(StringUtils::isBlank);
+        appendSummary("- whiteWordsCount: " + whiteWords.size());
 
         if (whiteWords.isEmpty()) {
             //如果白词文件为空，则使用原来的黑词模式
@@ -282,9 +296,22 @@ public class ZdmCrawler {
         JSONObject jsonObject = (JSONObject) JSONObject.parse(response);
         //状态码,非1000表示有异常
         String code = jsonObject.getString("code");
+        appendSummary("- WxPusher: code=" + code + ", msg=" + jsonObject.getString("msg"));
         if (!"1000".equals(code))
             throw new RuntimeException("WxPusher推送失败:" + jsonObject.getString("msg"));
         return true;
+    }
+
+    private static void appendSummary(String text) {
+        String summaryPath = System.getenv("GITHUB_STEP_SUMMARY");
+        if (StringUtils.isBlank(summaryPath))
+            return;
+        try {
+            Files.writeString(Paths.get(summaryPath), text + System.lineSeparator(), StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (Exception e) {
+            System.out.println("写入GitHub Step Summary失败:" + e.getMessage());
+        }
     }
 
     private static Collection<HttpCookie> buildCookies() throws TimeoutException {
