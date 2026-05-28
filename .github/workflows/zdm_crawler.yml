@@ -34,8 +34,8 @@ jobs:
       uses: actions/cache@v4
       with:
         path: database_old.db
-        key: ${{ runner.os }}-database_old-${{ github.run_number }}
-        restore-keys: ${{ runner.os }}-database_old-
+        key: ${{ runner.os }}-database_reset_20260529-${{ github.run_number }}
+        restore-keys: ${{ runner.os }}-database_reset_20260529-
     - name: database cache copy
       id: db_copy
       run: |
